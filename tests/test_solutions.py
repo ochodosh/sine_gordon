@@ -1,5 +1,5 @@
 """
-Tests for the k-ended sine-Gordon solutions.
+Tests for the k-ended sine-Gordon solutions (Δu = sin(u), u ∈ (0, 2π)).
 
 Each test checks the Hirota formula against a known closed-form arctan
 expression, verifies PDE satisfaction, differentiability, and JIT.
@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from sine_gordon import u_n, u_n_from_angles
+from sine_gordon import heteroclinic, r, u_n, u_n_from_angles
 
 jax.config.update("jax_enable_x64", True)
 
@@ -46,7 +46,7 @@ class TestClosedForms:
         eta0 = jnp.array([0.7])
 
         got = u_n(p, q, eta0, _X, _Y)
-        expected = 4.0 * jnp.arctan(jnp.exp(p[0] * _X + q[0] * _Y + eta0[0])) - jnp.pi
+        expected = 4.0 * jnp.arctan(jnp.exp(p[0] * _X + q[0] * _Y + eta0[0]))
 
         assert jnp.allclose(got, expected, atol=1e-6), (
             f"max |err| = {jnp.max(jnp.abs(got - expected)):.2e}"
@@ -63,7 +63,7 @@ class TestClosedForms:
         eta0 = jnp.zeros(2)
 
         got = u_n(p, q, eta0, _X, _Y)
-        expected = 4.0 * jnp.arctan(jnp.cosh(_Y * s) / jnp.cosh(_X * s)) - jnp.pi
+        expected = 4.0 * jnp.arctan(jnp.cosh(_Y * s) / jnp.cosh(_X * s))
 
         assert jnp.allclose(got, expected, atol=1e-6), (
             f"max |err| = {jnp.max(jnp.abs(got - expected)):.2e}"
@@ -88,10 +88,7 @@ class TestClosedForms:
         eta0 = jnp.full(2, jnp.log(p_val / q_val))
 
         got = u_n(p, q, eta0, _X, _Y)
-        expected = (
-            4.0 * jnp.arctan(p_val * jnp.cosh(q_val * _Y) / (q_val * jnp.cosh(p_val * _X)))
-            - jnp.pi
-        )
+        expected = 4.0 * jnp.arctan(p_val * jnp.cosh(q_val * _Y) / (q_val * jnp.cosh(p_val * _X)))
 
         assert jnp.allclose(got, expected, atol=1e-6), (
             f"angle={float(angle):.3f}: max |err| = {jnp.max(jnp.abs(got - expected)):.2e}"
@@ -103,7 +100,7 @@ class TestClosedForms:
 # ---------------------------------------------------------------------------
 
 class TestPDE:
-    """Verify −ΔU_n = sin(U_n) numerically via JAX hessian."""
+    """Verify ΔU_n = sin(U_n) numerically via JAX hessian."""
 
     @pytest.mark.parametrize("n_ends,params", [
         (
@@ -132,7 +129,7 @@ class TestPDE:
         ),
     ])
     def test_pde_residual(self, n_ends, params):
-        """Max |−ΔU_n − sin(U_n)| < 1e-4 on a coarse grid."""
+        """Max |ΔU_n − sin(U_n)| < 1e-4 on a coarse grid."""
         p, q, eta0 = params["p"], params["q"], params["eta0"]
 
         # Evaluate on a small set of interior points (hessian is per-point)
@@ -142,7 +139,7 @@ class TestPDE:
             f = lambda x_, y_: u_n(p, q, eta0, x_, y_)
             lap = _laplacian_at(f, x_val, y_val)
             u_val = float(u_n(p, q, eta0, jnp.array(x_val), jnp.array(y_val)))
-            residuals.append(abs(float(lap) + jnp.sin(u_val)))
+            residuals.append(abs(float(lap) - jnp.sin(u_val)))
 
         max_res = max(residuals)
         assert max_res < 1e-4, f"n={n_ends}: max PDE residual = {max_res:.2e}"
@@ -220,4 +217,60 @@ class TestJIT:
 
         assert result.shape == _X.shape
         assert jnp.all(jnp.isfinite(result))
-        assert jnp.all(result > -jnp.pi) and jnp.all(result < jnp.pi)
+        assert jnp.all(result > 0) and jnp.all(result < 2 * jnp.pi)
+
+
+# ---------------------------------------------------------------------------
+# Heteroclinic and its inverse r
+# ---------------------------------------------------------------------------
+
+class TestHeteroclinicAndR:
+    """Tests for H(y) = 4 arctan(exp(y)) and r = H⁻¹."""
+
+    _ys = jnp.linspace(-5.0, 5.0, 200)
+
+    def test_heteroclinic_range(self):
+        """H maps ℝ into (0, 2π)."""
+        H = heteroclinic(self._ys)
+        assert jnp.all(H > 0) and jnp.all(H < 2 * jnp.pi)
+
+    def test_heteroclinic_midpoint(self):
+        """H(0) = π."""
+        assert jnp.allclose(heteroclinic(jnp.array(0.0)), jnp.pi, atol=1e-7)
+
+    def test_heteroclinic_satisfies_pde(self):
+        """H satisfies ΔH = sin(H) (1D: H''(y) = sin(H(y)))."""
+        check_ys = [-3.0, -1.0, 0.0, 1.0, 3.0]
+        for y_val in check_ys:
+            d2H = float(jax.grad(jax.grad(lambda y_: heteroclinic(y_)))(jnp.array(y_val)))
+            H_val = float(heteroclinic(jnp.array(y_val)))
+            assert abs(d2H - jnp.sin(H_val)) < 1e-5, (
+                f"y={y_val}: H''={d2H:.6f}, sin(H)={float(jnp.sin(H_val)):.6f}"
+            )
+
+    def test_r_is_inverse_of_H(self):
+        """r(H(y)) = y for y ∈ [−5, 5]."""
+        roundtrip = r(heteroclinic(self._ys))
+        assert jnp.allclose(roundtrip, self._ys, atol=1e-6), (
+            f"max |r(H(y)) - y| = {jnp.max(jnp.abs(roundtrip - self._ys)):.2e}"
+        )
+
+    def test_H_is_inverse_of_r(self):
+        """H(r(u)) = u for u ∈ (0, 2π) (away from endpoints)."""
+        us = jnp.linspace(0.05, 2 * jnp.pi - 0.05, 200)
+        roundtrip = heteroclinic(r(us))
+        assert jnp.allclose(roundtrip, us, atol=1e-6), (
+            f"max |H(r(u)) - u| = {jnp.max(jnp.abs(roundtrip - us)):.2e}"
+        )
+
+    def test_r_explicit_formula(self):
+        """r(u) = log(tan(u/4)) agrees with numerical inversion of H."""
+        us = jnp.linspace(0.1, 2 * jnp.pi - 0.1, 100)
+        assert jnp.allclose(r(us), jnp.log(jnp.tan(us / 4.0)), atol=1e-7)
+
+    def test_r_grad_finite(self):
+        """jax.grad(r) is finite at interior points."""
+        grad_r = jax.grad(lambda u_: r(u_))
+        for u_val in [0.5, jnp.pi, 5.0]:
+            g = grad_r(jnp.array(u_val))
+            assert jnp.isfinite(g), f"grad r not finite at u={u_val}: {g}"

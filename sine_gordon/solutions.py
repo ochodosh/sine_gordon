@@ -1,5 +1,5 @@
 """
-2n-ended solutions to the elliptic sine-Gordon equation -Δu = sin(u) on R².
+2n-ended solutions to the elliptic sine-Gordon equation Δu = sin(u) on R².
 
 Reference: Liu & Wei, "Classification of Finite Morse Index Solutions to the
 Elliptic Sine-Gordon Equation in the Plane" (2021), §2.
@@ -8,11 +8,13 @@ The solution family U_n depends on parameters:
   p_j, q_j  with  p_j² + q_j² = 1,  j = 1, …, n   (end directions)
   η_j⁰  ∈ ℝ,                          j = 1, …, n   (phase offsets)
 
-Formula (Eq. 2.15):
-  U_n(x, y) = 4 arctan(g_n / f_n) − π
+Formula (Eq. 2.15, shifted by π):
+  U_n(x, y) = 4 arctan(g_n / f_n)
 
 where f_n, g_n are the even/odd-subset tau functions built from the
 interaction coefficients α(j,k) via the Hirota direct method (Eqs. 2.4–2.9).
+The shift by π relative to the paper's formula converts the convention
+−ΔU = sin(U) to ΔU = sin(U) and places solutions in (0, 2π).
 
 All operations are JAX-compatible and fully differentiable w.r.t. (x, y)
 and all parameters (p, q, η⁰).  The subset enumeration (`itertools.combinations`)
@@ -64,7 +66,7 @@ def u_n(
     x: jax.Array,
     y: jax.Array,
 ) -> jax.Array:
-    """2n-ended solution to -Δu = sin(u).
+    """2n-ended solution to Δu = sin(u).
 
     Args:
         p:    (n,) direction cosines, must satisfy p[j]² + q[j]² = 1.
@@ -74,7 +76,7 @@ def u_n(
         y:    (...) y-coordinates (same shape as x).
 
     Returns:
-        U_n of shape (...), values in (−π, π), satisfying −ΔU_n = sin(U_n).
+        U_n of shape (...), values in (0, 2π), satisfying ΔU_n = sin(U_n).
     """
     n = p.shape[0]
     alpha = alpha_matrix(p, q)  # (n, n)
@@ -120,7 +122,33 @@ def u_n(
     # Choosing m = max(log_g, log_f) keeps the larger argument at 1.0,
     # preventing overflow while preserving the ratio exactly.
     m = jnp.maximum(log_f, log_g)
-    return 4.0 * jnp.arctan2(jnp.exp(log_g - m), jnp.exp(log_f - m)) - jnp.pi
+    return 4.0 * jnp.arctan2(jnp.exp(log_g - m), jnp.exp(log_f - m))
+
+
+def heteroclinic(y: jax.Array) -> jax.Array:
+    """Heteroclinic (1-ended) solution H whose end is the x-axis.
+
+    H(y) = 4 arctan(exp(y)), a function of y only, satisfying ΔH = sin(H).
+    Range: (0, 2π), with H(0) = π, H → 0 as y → −∞, H → 2π as y → +∞.
+    """
+    return 4.0 * jnp.arctan(jnp.exp(y))
+
+
+def r(u: jax.Array) -> jax.Array:
+    """Inverse of the heteroclinic solution: r = H⁻¹.
+
+    Derived by inverting H(y) = 4 arctan(exp(y)):
+      u/4 = arctan(exp(y))  →  exp(y) = tan(u/4)  →  y = log(tan(u/4))
+
+    So r(u) = log(tan(u/4)), valid for u ∈ (0, 2π).
+
+    Args:
+        u: (...) values in (0, 2π).
+
+    Returns:
+        r(u) of the same shape, in ℝ.
+    """
+    return jnp.log(jnp.tan(u / 4.0))
 
 
 def u_n_from_angles(
@@ -140,6 +168,6 @@ def u_n_from_angles(
         x, y:  spatial coordinates.
 
     Returns:
-        U_n satisfying −ΔU_n = sin(U_n).
+        U_n satisfying ΔU_n = sin(U_n).
     """
     return u_n(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
