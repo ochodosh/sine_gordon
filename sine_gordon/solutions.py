@@ -125,7 +125,7 @@ def u_n(
     return 4.0 * jnp.arctan2(jnp.exp(log_g - m), jnp.exp(log_f - m))
 
 
-def W(t: jax.Array) -> jax.Array:
+def double_well(t: jax.Array) -> jax.Array:
     """Double-well potential W(t) = 1 - cos(t).
 
     The sine-Gordon PDE is the Euler-Lagrange equation for this potential:
@@ -146,13 +146,13 @@ def heteroclinic(y: jax.Array) -> jax.Array:
     return 4.0 * jnp.arctan(jnp.exp(y))
 
 
-def r(u: jax.Array) -> jax.Array:
+def heteroclinic_inverse(u: jax.Array) -> jax.Array:
     """Inverse of the heteroclinic solution: r = H⁻¹.
 
     Derived by inverting H(y) = 4 arctan(exp(y)):
       u/4 = arctan(exp(y))  →  exp(y) = tan(u/4)  →  y = log(tan(u/4))
 
-    So r(u) = log(tan(u/4)), valid for u ∈ (0, 2π).
+    So heteroclinic_inverse(u) = log(tan(u/4)), valid for u ∈ (0, 2π).
 
     Args:
         u: (...) values in (0, 2π).

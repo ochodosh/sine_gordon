@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from sine_gordon import heteroclinic, r, u_n, u_n_from_angles
+from sine_gordon import heteroclinic, heteroclinic_inverse, u_n, u_n_from_angles
 
 jax.config.update("jax_enable_x64", True)
 
@@ -221,11 +221,11 @@ class TestJIT:
 
 
 # ---------------------------------------------------------------------------
-# Heteroclinic and its inverse r
+# Heteroclinic and its inverse
 # ---------------------------------------------------------------------------
 
 class TestHeteroclinicAndR:
-    """Tests for H(y) = 4 arctan(exp(y)) and r = H⁻¹."""
+    """Tests for H(y) = 4 arctan(exp(y)) and heteroclinic_inverse = H⁻¹."""
 
     _ys = jnp.linspace(-5.0, 5.0, 200)
 
@@ -249,28 +249,28 @@ class TestHeteroclinicAndR:
             )
 
     def test_r_is_inverse_of_H(self):
-        """r(H(y)) = y for y ∈ [−5, 5]."""
-        roundtrip = r(heteroclinic(self._ys))
+        """heteroclinic_inverse(H(y)) = y for y ∈ [−5, 5]."""
+        roundtrip = heteroclinic_inverse(heteroclinic(self._ys))
         assert jnp.allclose(roundtrip, self._ys, atol=1e-6), (
-            f"max |r(H(y)) - y| = {jnp.max(jnp.abs(roundtrip - self._ys)):.2e}"
+            f"max |heteroclinic_inverse(H(y)) - y| = {jnp.max(jnp.abs(roundtrip - self._ys)):.2e}"
         )
 
     def test_H_is_inverse_of_r(self):
-        """H(r(u)) = u for u ∈ (0, 2π) (away from endpoints)."""
+        """H(heteroclinic_inverse(u)) = u for u ∈ (0, 2π) (away from endpoints)."""
         us = jnp.linspace(0.05, 2 * jnp.pi - 0.05, 200)
-        roundtrip = heteroclinic(r(us))
+        roundtrip = heteroclinic(heteroclinic_inverse(us))
         assert jnp.allclose(roundtrip, us, atol=1e-6), (
-            f"max |H(r(u)) - u| = {jnp.max(jnp.abs(roundtrip - us)):.2e}"
+            f"max |H(heteroclinic_inverse(u)) - u| = {jnp.max(jnp.abs(roundtrip - us)):.2e}"
         )
 
     def test_r_explicit_formula(self):
-        """r(u) = log(tan(u/4)) agrees with numerical inversion of H."""
+        """heteroclinic_inverse(u) = log(tan(u/4)) agrees with numerical inversion of H."""
         us = jnp.linspace(0.1, 2 * jnp.pi - 0.1, 100)
-        assert jnp.allclose(r(us), jnp.log(jnp.tan(us / 4.0)), atol=1e-7)
+        assert jnp.allclose(heteroclinic_inverse(us), jnp.log(jnp.tan(us / 4.0)), atol=1e-7)
 
     def test_r_grad_finite(self):
-        """jax.grad(r) is finite at interior points."""
-        grad_r = jax.grad(lambda u_: r(u_))
+        """jax.grad of heteroclinic_inverse is finite at interior points."""
+        grad_hinv = jax.grad(heteroclinic_inverse)
         for u_val in [0.5, jnp.pi, 5.0]:
-            g = grad_r(jnp.array(u_val))
-            assert jnp.isfinite(g), f"grad r not finite at u={u_val}: {g}"
+            g = grad_hinv(jnp.array(u_val))
+            assert jnp.isfinite(g), f"grad heteroclinic_inverse not finite at u={u_val}: {g}"

@@ -69,7 +69,7 @@ $$H(y) = 4 \arctan\!\bigl(e^{y}\bigr).$$
 
 This is a function of $y$ only (constant along the $x$-axis), with $H(0) = \pi$, $H \to 0$ as $y \to -\infty$, and $H \to 2\pi$ as $y \to +\infty$. Its inverse is explicit:
 
-$$r(u) = H^{-1}(u) = \log\!\tan\!\frac{u}{4}, \qquad u \in (0, 2\pi).$$
+$$\mathrm{heteroclinic\_inverse}(u) = H^{-1}(u) = \log\!\tan\!\frac{u}{4}, \qquad u \in (0, 2\pi).$$
 
 ### $k = 2$: 4-ended solutions
 
@@ -103,8 +103,8 @@ pyproject.toml
 | `u_n(p, q, eta0, x, y)` | 2*n*-ended solution; `p`, `q`, `eta0` are `(n,)` arrays |
 | `u_n_from_angles(theta, eta0, x, y)` | Same, parameterised by angles $\theta_j$ (unconstrained optimisation) |
 | `heteroclinic(y)` | $H(y) = 4\arctan(e^y)$ |
-| `r(u)` | $r(u) = \log\tan(u/4)$, the inverse of $H$ |
-| `W(t)` | Double-well potential $W(t) = 1 - \cos t$; satisfies $W'(t) = \sin t$ |
+| `heteroclinic_inverse(u)` | $H^{-1}(u) = \log\tan(u/4)$, the inverse of $H$ |
+| `double_well(t)` | Double-well potential $W(t) = 1 - \cos t$; satisfies $W'(t) = \sin t$ |
 | `alpha_matrix(p, q)` | $(n \times n)$ interaction coefficient matrix |
 
 All functions are JAX-compatible: supports `jax.jit`, `jax.grad`, `jax.vmap`, and `jax.hessian`.
@@ -122,7 +122,7 @@ import jax
 import jax.numpy as jnp
 jax.config.update("jax_enable_x64", True)
 
-from sine_gordon import W, u_n, u_n_from_angles, heteroclinic, r
+from sine_gordon import double_well, u_n, u_n_from_angles, heteroclinic, heteroclinic_inverse
 
 # --- Heteroclinic (k=1) ---
 ys = jnp.linspace(-5, 5, 300)
