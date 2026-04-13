@@ -125,6 +125,18 @@ def u_n(
     return 4.0 * jnp.arctan2(jnp.exp(log_g - m), jnp.exp(log_f - m))
 
 
+def W(t: jax.Array) -> jax.Array:
+    """Double-well potential W(t) = 1 - cos(t).
+
+    The sine-Gordon PDE is the Euler-Lagrange equation for this potential:
+      W'(t) = sin(t),  so  Δu = sin(u) = W'(u).
+
+    Wells at t = 2πk, k ∈ ℤ.  For u ∈ (0, 2π), the relevant wells are
+    t = 0 and t = 2π (identified), with a single barrier at t = π.
+    """
+    return 1.0 - jnp.cos(t)
+
+
 def heteroclinic(y: jax.Array) -> jax.Array:
     """Heteroclinic (1-ended) solution H whose end is the x-axis.
 

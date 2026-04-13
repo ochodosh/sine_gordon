@@ -19,7 +19,9 @@ constructed via the Hirota direct method.
 
 The **elliptic sine-Gordon equation** on the plane is taken to be
 
-$$\Delta u = \sin u.$$
+$$\Delta u = \sin u = W'(u),$$
+
+where $W(t) = 1 - \cos t$ is the **double-well potential** with wells at $t \in 2\pi\mathbb{Z}$.
 
 For each integer $n \geq 1$, there is a family of **2*n*-ended solutions** $U_n$ parameterised by
 
@@ -102,6 +104,7 @@ pyproject.toml
 | `u_n_from_angles(theta, eta0, x, y)` | Same, parameterised by angles $\theta_j$ (unconstrained optimisation) |
 | `heteroclinic(y)` | $H(y) = 4\arctan(e^y)$ |
 | `r(u)` | $r(u) = \log\tan(u/4)$, the inverse of $H$ |
+| `W(t)` | Double-well potential $W(t) = 1 - \cos t$; satisfies $W'(t) = \sin t$ |
 | `alpha_matrix(p, q)` | $(n \times n)$ interaction coefficient matrix |
 
 All functions are JAX-compatible: supports `jax.jit`, `jax.grad`, `jax.vmap`, and `jax.hessian`.
@@ -119,7 +122,7 @@ import jax
 import jax.numpy as jnp
 jax.config.update("jax_enable_x64", True)
 
-from sine_gordon import u_n, u_n_from_angles, heteroclinic, r
+from sine_gordon import W, u_n, u_n_from_angles, heteroclinic, r
 
 # --- Heteroclinic (k=1) ---
 ys = jnp.linspace(-5, 5, 300)
