@@ -6,6 +6,13 @@ $$\Delta u = \sin u, \qquad u : \mathbb{R}^2 \to (0, 2\pi),$$
 
 constructed via the Hirota direct method. 
 
+## References
+
+**[LW]** Y. Liu and J. Wei, Classification of finite Morse index solutions to the elliptic sine-Gordon equation in the plane. Rev. Mat. Iberoam. 38 (2022), no. 2, 355–432.
+
+**[CM]** O. Chodosh and C. Mantoulidis, The p-widths of a surface. Publ. Math. Inst. Hautes Études Sci. 137 (2023), 245–342.
+
+
 ---
 
 ## The PDE and solution family
@@ -21,13 +28,6 @@ For each integer $n \geq 1$, there is a family of **2*n*-ended solutions** $U_n$
 
 ---
 
-## References
-
-**[LW]** Y. Liu and J. Wei, Classification of finite Morse index solutions to the elliptic sine-Gordon equation in the plane. Rev. Mat. Iberoam. 38 (2022), no. 2, 355–432.
-
-**[CM]** O. Chodosh and C. Mantoulidis, The p-widths of a surface. Publ. Math. Inst. Hautes Études Sci. 137 (2023), 245–342.
-
----
 
 ### Hirota tau-function formula
 
