@@ -183,3 +183,198 @@ def u_n_from_angles(
         U_n satisfying ΔU_n = sin(U_n).
     """
     return u_n(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
+
+
+# ---------------------------------------------------------------------------
+# Differential helpers
+# ---------------------------------------------------------------------------
+
+def _broadcast_xy(x: jax.Array, y: jax.Array) -> tuple[jax.Array, jax.Array]:
+    """Broadcast spatial coordinates to a common shape."""
+    return jnp.broadcast_arrays(jnp.asarray(x), jnp.asarray(y))
+
+
+def _evaluate_pointwise_operator(
+    operator,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Vectorise a pointwise operator on spatial coordinates over broadcasted x, y."""
+    x_b, y_b = _broadcast_xy(x, y)
+    coords = jnp.stack((x_b, y_b), axis=-1).reshape((-1, 2))
+    values = jax.vmap(operator)(coords)
+    return values.reshape(x_b.shape + values.shape[1:])
+
+
+def _pointwise_u_n(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+):
+    """Scalar map xy ↦ U_n(x, y) used for pointwise differentiation."""
+    return lambda xy: u_n(p, q, eta0, xy[0], xy[1])
+
+
+def _grad_hessian_u_n(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> tuple[jax.Array, jax.Array]:
+    """Return ∇u and D²u on the broadcasted spatial grid."""
+    scalar_u = _pointwise_u_n(p, q, eta0)
+    grad = _evaluate_pointwise_operator(jax.grad(scalar_u), x, y)
+    hessian = _evaluate_pointwise_operator(jax.hessian(scalar_u), x, y)
+    return grad, hessian
+
+
+def grad_u_n(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Spatial gradient ∇u of U_n, returned with shape (..., 2)."""
+    scalar_u = _pointwise_u_n(p, q, eta0)
+    return _evaluate_pointwise_operator(jax.grad(scalar_u), x, y)
+
+
+def grad_u_n_norm(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Euclidean norm |∇u| of U_n."""
+    return jnp.linalg.norm(grad_u_n(p, q, eta0, x, y), axis=-1)
+
+
+def hessian_u_n(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Spatial Hessian D²u of U_n, returned with shape (..., 2, 2)."""
+    scalar_u = _pointwise_u_n(p, q, eta0)
+    return _evaluate_pointwise_operator(jax.hessian(scalar_u), x, y)
+
+
+def hessian_u_n_norm(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Frobenius norm |D²u| of U_n."""
+    return jnp.linalg.norm(hessian_u_n(p, q, eta0, x, y), axis=(-2, -1))
+
+
+def hessian_u_n_grad(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Vector identified with the covector D²u(∇u, ·)."""
+    grad, hessian = _grad_hessian_u_n(p, q, eta0, x, y)
+    return jnp.einsum("...ij,...j->...i", hessian, grad)
+
+
+def hessian_u_n_grad_norm(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Euclidean norm |D²u(∇u, ·)| of U_n."""
+    return jnp.linalg.norm(hessian_u_n_grad(p, q, eta0, x, y), axis=-1)
+
+
+def hessian_u_n_grad_grad(
+    p: jax.Array,
+    q: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Quadratic form D²u(∇u, ∇u) of U_n."""
+    grad, hessian = _grad_hessian_u_n(p, q, eta0, x, y)
+    return jnp.einsum("...i,...ij,...j->...", grad, hessian, grad)
+
+
+def grad_u_n_from_angles(
+    theta: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Spatial gradient ∇u for the angle-parameterised solution."""
+    return grad_u_n(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
+
+
+def grad_u_n_norm_from_angles(
+    theta: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Euclidean norm |∇u| for the angle-parameterised solution."""
+    return grad_u_n_norm(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
+
+
+def hessian_u_n_from_angles(
+    theta: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Spatial Hessian D²u for the angle-parameterised solution."""
+    return hessian_u_n(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
+
+
+def hessian_u_n_norm_from_angles(
+    theta: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Frobenius norm |D²u| for the angle-parameterised solution."""
+    return hessian_u_n_norm(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
+
+
+def hessian_u_n_grad_from_angles(
+    theta: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Vector identified with D²u(∇u, ·) for the angle-parameterised solution."""
+    return hessian_u_n_grad(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
+
+
+def hessian_u_n_grad_norm_from_angles(
+    theta: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Euclidean norm |D²u(∇u, ·)| for the angle-parameterised solution."""
+    return hessian_u_n_grad_norm(jnp.cos(theta), jnp.sin(theta), eta0, x, y)
+
+
+def hessian_u_n_grad_grad_from_angles(
+    theta: jax.Array,
+    eta0: jax.Array,
+    x: jax.Array,
+    y: jax.Array,
+) -> jax.Array:
+    """Quadratic form D²u(∇u, ∇u) for the angle-parameterised solution."""
+    return hessian_u_n_grad_grad(jnp.cos(theta), jnp.sin(theta), eta0, x, y)

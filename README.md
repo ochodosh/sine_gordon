@@ -98,6 +98,8 @@ pyproject.toml
 
 ### Public API (`from sine_gordon import ...`)
 
+#### Core solution functions
+
 | Symbol | Description |
 |---|---|
 | `u_n(p, q, eta0, x, y)` | 2*n*-ended solution; `p`, `q`, `eta0` are `(n,)` arrays |
@@ -106,6 +108,27 @@ pyproject.toml
 | `heteroclinic_inverse(u)` | $H^{-1}(u) = \log\tan(u/4)$, the inverse of $H$ |
 | `double_well(t)` | Double-well potential $W(t) = 1 - \cos t$; satisfies $W'(t) = \sin t$ |
 | `alpha_matrix(p, q)` | $(n \times n)$ interaction coefficient matrix |
+
+#### Differential helper functions
+
+| Symbol | Description |
+|---|---|
+| `grad_u_n(p, q, eta0, x, y)` | Spatial gradient $\nabla u$ with shape `(..., 2)` |
+| `grad_u_n_norm(p, q, eta0, x, y)` | Euclidean norm $|\nabla u|$ with shape `(...)` |
+| `hessian_u_n(p, q, eta0, x, y)` | Spatial Hessian $D^2u$ with shape `(..., 2, 2)` |
+| `hessian_u_n_norm(p, q, eta0, x, y)` | Frobenius norm $|D^2u|$ with shape `(...)` |
+| `hessian_u_n_grad(p, q, eta0, x, y)` | Vector identified with the covector $D^2u(\nabla u,\cdot)$, shape `(..., 2)` |
+| `hessian_u_n_grad_norm(p, q, eta0, x, y)` | Euclidean norm $|D^2u(\nabla u,\cdot)|$ with shape `(...)` |
+| `hessian_u_n_grad_grad(p, q, eta0, x, y)` | Quadratic form $D^2u(\nabla u,\nabla u)$ with shape `(...)` |
+| `grad_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `grad_u_n` |
+| `grad_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `grad_u_n_norm` |
+| `hessian_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n` |
+| `hessian_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_norm` |
+| `hessian_u_n_grad_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_grad` |
+| `hessian_u_n_grad_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_grad_norm` |
+| `hessian_u_n_grad_grad_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_grad_grad` |
+
+Norm conventions: vector-valued quantities use the Euclidean norm, and `hessian_u_n_norm` uses the Frobenius norm. The helper `hessian_u_n_grad` returns the Euclidean vector corresponding to the covector $D^2u(\nabla u,\cdot)$. We do not currently expose $|\nabla |\nabla u||$.
 
 All functions are JAX-compatible: supports `jax.jit`, `jax.grad`, `jax.vmap`, and `jax.hessian`.
 
@@ -122,7 +145,16 @@ import jax
 import jax.numpy as jnp
 jax.config.update("jax_enable_x64", True)
 
-from sine_gordon import double_well, u_n, u_n_from_angles, heteroclinic, heteroclinic_inverse
+from sine_gordon import (
+    double_well,
+    grad_u_n,
+    heteroclinic,
+    heteroclinic_inverse,
+    hessian_u_n,
+    hessian_u_n_grad_norm,
+    u_n,
+    u_n_from_angles,
+)
 
 # --- Heteroclinic (k=1) ---
 ys = jnp.linspace(-5, 5, 300)
@@ -141,6 +173,11 @@ U = u_n(p, q, eta0, X, Y)     # shape (200, 200)
 # --- Angle parameterisation (convenient for optimisation) ---
 theta = jnp.array([jnp.pi / 6, jnp.pi / 3])
 U2 = u_n_from_angles(theta, eta0, X, Y)
+
+# --- Differential quantities ---
+grad_U = grad_u_n(p, q, eta0, X, Y)                  # shape (200, 200, 2)
+hess_U = hessian_u_n(p, q, eta0, X, Y)               # shape (200, 200, 2, 2)
+hess_grad_norm = hessian_u_n_grad_norm(p, q, eta0, X, Y)  # shape (200, 200)
 
 # --- Gradients w.r.t. parameters ---
 loss = lambda th: jnp.mean(u_n_from_angles(th, eta0, X, Y))

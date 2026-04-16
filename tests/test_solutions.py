@@ -9,7 +9,26 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from sine_gordon import heteroclinic, heteroclinic_inverse, u_n, u_n_from_angles
+from sine_gordon import (
+    grad_u_n,
+    grad_u_n_from_angles,
+    grad_u_n_norm,
+    grad_u_n_norm_from_angles,
+    heteroclinic,
+    heteroclinic_inverse,
+    hessian_u_n,
+    hessian_u_n_from_angles,
+    hessian_u_n_grad,
+    hessian_u_n_grad_from_angles,
+    hessian_u_n_grad_grad,
+    hessian_u_n_grad_grad_from_angles,
+    hessian_u_n_grad_norm,
+    hessian_u_n_grad_norm_from_angles,
+    hessian_u_n_norm,
+    hessian_u_n_norm_from_angles,
+    u_n,
+    u_n_from_angles,
+)
 
 jax.config.update("jax_enable_x64", True)
 
@@ -27,6 +46,17 @@ def _laplacian_at(f_scalar, x_val: float, y_val: float) -> float:
     xy = jnp.array([x_val, y_val])
     H = jax.hessian(lambda xy_: f_scalar(xy_[0], xy_[1]))(xy)
     return H[0, 0] + H[1, 1]
+
+
+def _u1_closed_form(p0: float, q0: float, eta00: float, x, y):
+    """Closed form for the n=1 solution."""
+    return 4.0 * jnp.arctan(jnp.exp(p0 * x + q0 * y + eta00))
+
+
+def _u2_saddle_closed_form(x, y):
+    """Closed form for the symmetric four-ended saddle."""
+    s = 1.0 / jnp.sqrt(2.0)
+    return 4.0 * jnp.arctan(jnp.cosh(y * s) / jnp.cosh(x * s))
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +232,134 @@ class TestDifferentiability:
 
 
 # ---------------------------------------------------------------------------
+# Differential helper tests
+# ---------------------------------------------------------------------------
+
+class TestDifferentialHelpers:
+    """Verify public gradient/Hessian helpers and their derived quantities."""
+
+    def test_shapes_with_broadcasted_inputs(self):
+        s = 1.0 / jnp.sqrt(2.0)
+        p = jnp.array([s, s])
+        q = jnp.array([s, -s])
+        eta0 = jnp.zeros(2)
+        xs = jnp.linspace(-2.0, 2.0, 4)[:, None]
+        ys = jnp.linspace(-1.5, 1.5, 5)[None, :]
+
+        grad = grad_u_n(p, q, eta0, xs, ys)
+        hessian = hessian_u_n(p, q, eta0, xs, ys)
+
+        assert grad.shape == (4, 5, 2)
+        assert hessian.shape == (4, 5, 2, 2)
+
+    def test_n1_closed_form_grad_and_hessian(self):
+        p0 = 3.0 / 5.0
+        q0 = 4.0 / 5.0
+        eta00 = 0.7
+        p = jnp.array([p0])
+        q = jnp.array([q0])
+        eta0 = jnp.array([eta00])
+        xy = jnp.array([0.3, -0.4])
+
+        closed_form = lambda xy_: _u1_closed_form(p0, q0, eta00, xy_[0], xy_[1])
+        expected_grad = jax.grad(closed_form)(xy)
+        expected_hessian = jax.hessian(closed_form)(xy)
+
+        got_grad = grad_u_n(p, q, eta0, xy[0], xy[1])
+        got_hessian = hessian_u_n(p, q, eta0, xy[0], xy[1])
+
+        assert jnp.allclose(got_grad, expected_grad, atol=1e-6)
+        assert jnp.allclose(got_hessian, expected_hessian, atol=1e-6)
+
+    def test_n2_saddle_closed_form_grad_and_hessian(self):
+        s = 1.0 / jnp.sqrt(2.0)
+        p = jnp.array([s, s])
+        q = jnp.array([s, -s])
+        eta0 = jnp.zeros(2)
+        xy = jnp.array([0.6, -0.8])
+
+        closed_form = lambda xy_: _u2_saddle_closed_form(xy_[0], xy_[1])
+        expected_grad = jax.grad(closed_form)(xy)
+        expected_hessian = jax.hessian(closed_form)(xy)
+
+        got_grad = grad_u_n(p, q, eta0, xy[0], xy[1])
+        got_hessian = hessian_u_n(p, q, eta0, xy[0], xy[1])
+
+        assert jnp.allclose(got_grad, expected_grad, atol=1e-6)
+        assert jnp.allclose(got_hessian, expected_hessian, atol=1e-6)
+
+    def test_derived_quantities_match_tensor_contractions(self):
+        s = 1.0 / jnp.sqrt(2.0)
+        p = jnp.array([s, s])
+        q = jnp.array([s, -s])
+        eta0 = jnp.zeros(2)
+        xs = jnp.linspace(-1.5, 1.5, 4)
+        X, Y = jnp.meshgrid(xs, xs)
+
+        u = u_n(p, q, eta0, X, Y)
+        grad = grad_u_n(p, q, eta0, X, Y)
+        hessian = hessian_u_n(p, q, eta0, X, Y)
+        hessian_grad = hessian_u_n_grad(p, q, eta0, X, Y)
+
+        assert jnp.allclose(grad_u_n_norm(p, q, eta0, X, Y), jnp.linalg.norm(grad, axis=-1), atol=1e-6)
+        assert jnp.allclose(
+            hessian_u_n_norm(p, q, eta0, X, Y),
+            jnp.linalg.norm(hessian, axis=(-2, -1)),
+            atol=1e-6,
+        )
+        assert jnp.allclose(
+            hessian_grad,
+            jnp.einsum("...ij,...j->...i", hessian, grad),
+            atol=1e-6,
+        )
+        assert jnp.allclose(
+            hessian_u_n_grad_norm(p, q, eta0, X, Y),
+            jnp.linalg.norm(hessian_grad, axis=-1),
+            atol=1e-6,
+        )
+        assert jnp.allclose(
+            hessian_u_n_grad_grad(p, q, eta0, X, Y),
+            jnp.einsum("...i,...ij,...j->...", grad, hessian, grad),
+            atol=1e-6,
+        )
+        assert jnp.allclose(hessian[..., 0, 0] + hessian[..., 1, 1], jnp.sin(u), atol=1e-5)
+
+    def test_angle_wrappers_match_canonical_helpers(self):
+        theta = jnp.array([jnp.pi / 4.0, -jnp.pi / 4.0])
+        p = jnp.cos(theta)
+        q = jnp.sin(theta)
+        eta0 = jnp.array([0.1, -0.2])
+        x0 = jnp.array(0.7)
+        y0 = jnp.array(-0.5)
+
+        assert jnp.allclose(grad_u_n_from_angles(theta, eta0, x0, y0), grad_u_n(p, q, eta0, x0, y0))
+        assert jnp.allclose(
+            grad_u_n_norm_from_angles(theta, eta0, x0, y0),
+            grad_u_n_norm(p, q, eta0, x0, y0),
+        )
+        assert jnp.allclose(
+            hessian_u_n_from_angles(theta, eta0, x0, y0),
+            hessian_u_n(p, q, eta0, x0, y0),
+        )
+        assert jnp.allclose(
+            hessian_u_n_norm_from_angles(theta, eta0, x0, y0),
+            hessian_u_n_norm(p, q, eta0, x0, y0),
+        )
+        assert jnp.allclose(
+            hessian_u_n_grad_from_angles(theta, eta0, x0, y0),
+            hessian_u_n_grad(p, q, eta0, x0, y0),
+        )
+        assert jnp.allclose(
+            hessian_u_n_grad_norm_from_angles(theta, eta0, x0, y0),
+            hessian_u_n_grad_norm(p, q, eta0, x0, y0),
+        )
+        assert jnp.allclose(
+            hessian_u_n_grad_grad_from_angles(theta, eta0, x0, y0),
+            hessian_u_n_grad_grad(p, q, eta0, x0, y0),
+        )
+
+
+# ---------------------------------------------------------------------------
 # JIT test
 # ---------------------------------------------------------------------------
 
@@ -218,6 +376,25 @@ class TestJIT:
         assert result.shape == _X.shape
         assert jnp.all(jnp.isfinite(result))
         assert jnp.all(result > 0) and jnp.all(result < 2 * jnp.pi)
+
+    def test_jit_vector_and_matrix_helpers(self):
+        s = 1.0 / jnp.sqrt(2.0)
+        p = jnp.array([s, s])
+        q = jnp.array([s, -s])
+        eta0 = jnp.zeros(2)
+        X = _X[:3, :3]
+        Y = _Y[:3, :3]
+
+        jit_grad = jax.jit(grad_u_n)
+        jit_hessian = jax.jit(hessian_u_n)
+
+        grad = jit_grad(p, q, eta0, X, Y)
+        hessian = jit_hessian(p, q, eta0, X, Y)
+
+        assert grad.shape == X.shape + (2,)
+        assert hessian.shape == X.shape + (2, 2)
+        assert jnp.all(jnp.isfinite(grad))
+        assert jnp.all(jnp.isfinite(hessian))
 
 
 # ---------------------------------------------------------------------------
