@@ -116,37 +116,19 @@ pyproject.toml
 | `grad_u_n(p, q, eta0, x, y)` | Spatial gradient $\nabla u$ with shape `(..., 2)` |
 | `grad_u_n_norm(p, q, eta0, x, y)` | Euclidean norm $|\nabla u|$ with shape `(...)` |
 | `hessian_u_n(p, q, eta0, x, y)` | Spatial Hessian $D^2u$ with shape `(..., 2, 2)` |
-| `hessian_u_n_det(p, q, eta0, x, y)` | Determinant $\det(D^2u)$ with shape `(...)` |
 | `hessian_u_n_norm(p, q, eta0, x, y)` | Frobenius norm $|D^2u|$ with shape `(...)` |
 | `hessian_u_n_grad(p, q, eta0, x, y)` | Vector identified with the covector $D^2u(\nabla u,\cdot)$, shape `(..., 2)` |
 | `hessian_u_n_grad_norm(p, q, eta0, x, y)` | Euclidean norm $|D^2u(\nabla u,\cdot)|$ with shape `(...)` |
 | `hessian_u_n_grad_grad(p, q, eta0, x, y)` | Quadratic form $D^2u(\nabla u,\nabla u)$ with shape `(...)` |
-| `third_derivative_u_n(p, q, eta0, x, y)` | Third spatial derivative $D^3u$ with shape `(..., 2, 2, 2)` |
-| `third_derivative_u_n_norm(p, q, eta0, x, y)` | Frobenius norm $|D^3u|$ with shape `(...)` |
 | `modica_quantity_u_n(p, q, eta0, x, y)` | Modica quantity $|\nabla u|^2 - 2W(u)$ |
-| `modica_gradient_u_n(p, q, eta0, x, y)` | Gradient of the Modica quantity, shape `(..., 2)` |
-| `modica_gradient_u_n_norm(p, q, eta0, x, y)` | Euclidean norm of `modica_gradient_u_n` |
-| `one_dimensional_hessian_residual_u_n(p, q, eta0, x, y)` | Tensor $2W(u)D^2u - \sin(u)\nabla u \otimes \nabla u$ |
-| `one_dimensional_hessian_residual_u_n_norm(p, q, eta0, x, y)` | Frobenius norm of the Hessian residual |
-| `one_dimensional_third_derivative_residual_u_n(p, q, eta0, x, y)` | Tensor $2W(u)D^3u - \cos(u)\nabla u^{\otimes 3}$ |
-| `one_dimensional_third_derivative_residual_u_n_norm(p, q, eta0, x, y)` | Frobenius norm of the third-order residual |
 | `grad_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `grad_u_n` |
 | `grad_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `grad_u_n_norm` |
 | `hessian_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n` |
-| `hessian_u_n_det_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_det` |
 | `hessian_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_norm` |
 | `hessian_u_n_grad_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_grad` |
 | `hessian_u_n_grad_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_grad_norm` |
 | `hessian_u_n_grad_grad_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `hessian_u_n_grad_grad` |
-| `third_derivative_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `third_derivative_u_n` |
-| `third_derivative_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `third_derivative_u_n_norm` |
 | `modica_quantity_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `modica_quantity_u_n` |
-| `modica_gradient_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `modica_gradient_u_n` |
-| `modica_gradient_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `modica_gradient_u_n_norm` |
-| `one_dimensional_hessian_residual_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `one_dimensional_hessian_residual_u_n` |
-| `one_dimensional_hessian_residual_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `one_dimensional_hessian_residual_u_n_norm` |
-| `one_dimensional_third_derivative_residual_u_n_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `one_dimensional_third_derivative_residual_u_n` |
-| `one_dimensional_third_derivative_residual_u_n_norm_from_angles(theta, eta0, x, y)` | Angle-parameterised version of `one_dimensional_third_derivative_residual_u_n_norm` |
 
 Norm conventions: vector-valued quantities use the Euclidean norm, and `hessian_u_n_norm` uses the Frobenius norm. The helper `hessian_u_n_grad` returns the Euclidean vector corresponding to the covector $D^2u(\nabla u,\cdot)$. We do not currently expose $|\nabla |\nabla u||$.
 
@@ -154,18 +136,32 @@ All functions are JAX-compatible: supports `jax.jit`, `jax.grad`, `jax.vmap`, an
 
 ---
 
-## Heteroclinic Diagnostics
+## Modica Quantity
 
-Several differential quantities in the package are designed to detect when a solution is locally one-dimensional, meaning of the form
+The package exposes the Modica-type quantity
 
-$$u(x) = H(a \cdot x + b),$$
+$$
+M(u) = |\nabla u|^2 - 2W(u),
+$$
 
-with $H$ the heteroclinic and $|a| = 1$. For such profiles one has
+through `modica_quantity_u_n` and `modica_quantity_u_n_from_angles`. For a one-dimensional heteroclinic profile
 
-- $|\nabla u|^2 - 2W(u) = 0$,
-- $\nabla(|\nabla u|^2 - 2W(u)) = 0$,
-- $\det(D^2u) = 0$,
-- $2W(u)D^2u - \sin(u)\nabla u \otimes \nabla u = 0$,
-- $2W(u)D^3u - \cos(u)\nabla u \otimes \nabla u \otimes \nabla u = 0$.
+$$u(x) = H(a \cdot x + b), \qquad |a| = 1,$$
 
-These are exposed by `modica_quantity_u_n`, `modica_gradient_u_n`, `hessian_u_n_det`, `one_dimensional_hessian_residual_u_n`, and `one_dimensional_third_derivative_residual_u_n`, together with their norm and angle-parameterised variants.
+one has $M(u) \equiv 0$. More elaborate one-dimensionality diagnostics can be assembled externally from `u_n`, `grad_u_n`, and `hessian_u_n`.
+
+---
+
+## Google Colab Install
+
+```python
+!pip install -q jax jaxlib
+!pip install -q git+https://github.com/ochodosh/sine_gordon.git
+
+import jax
+jax.config.update("jax_enable_x64", True)
+
+from sine_gordon import u_n, modica_quantity_u_n
+```
+
+This installs the package directly from GitHub and exposes the core solution family together with the Modica quantity helper.

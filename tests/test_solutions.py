@@ -17,8 +17,6 @@ from sine_gordon import (
     heteroclinic,
     heteroclinic_inverse,
     hessian_u_n,
-    hessian_u_n_det,
-    hessian_u_n_det_from_angles,
     hessian_u_n_from_angles,
     hessian_u_n_grad,
     hessian_u_n_grad_from_angles,
@@ -28,24 +26,8 @@ from sine_gordon import (
     hessian_u_n_grad_norm_from_angles,
     hessian_u_n_norm,
     hessian_u_n_norm_from_angles,
-    modica_gradient_u_n,
-    modica_gradient_u_n_from_angles,
-    modica_gradient_u_n_norm,
-    modica_gradient_u_n_norm_from_angles,
     modica_quantity_u_n,
     modica_quantity_u_n_from_angles,
-    one_dimensional_hessian_residual_u_n,
-    one_dimensional_hessian_residual_u_n_from_angles,
-    one_dimensional_hessian_residual_u_n_norm,
-    one_dimensional_hessian_residual_u_n_norm_from_angles,
-    one_dimensional_third_derivative_residual_u_n,
-    one_dimensional_third_derivative_residual_u_n_from_angles,
-    one_dimensional_third_derivative_residual_u_n_norm,
-    one_dimensional_third_derivative_residual_u_n_norm_from_angles,
-    third_derivative_u_n,
-    third_derivative_u_n_from_angles,
-    third_derivative_u_n_norm,
-    third_derivative_u_n_norm_from_angles,
     u_n,
     u_n_from_angles,
 )
@@ -268,11 +250,9 @@ class TestDifferentialHelpers:
 
         grad = grad_u_n(p, q, eta0, xs, ys)
         hessian = hessian_u_n(p, q, eta0, xs, ys)
-        third = third_derivative_u_n(p, q, eta0, xs, ys)
 
         assert grad.shape == (4, 5, 2)
         assert hessian.shape == (4, 5, 2, 2)
-        assert third.shape == (4, 5, 2, 2, 2)
 
     def test_n1_closed_form_grad_and_hessian(self):
         p0 = 3.0 / 5.0
@@ -310,21 +290,6 @@ class TestDifferentialHelpers:
         assert jnp.allclose(got_grad, expected_grad, atol=1e-6)
         assert jnp.allclose(got_hessian, expected_hessian, atol=1e-6)
 
-    def test_n1_closed_form_third_derivative(self):
-        p0 = 3.0 / 5.0
-        q0 = 4.0 / 5.0
-        eta00 = 0.7
-        p = jnp.array([p0])
-        q = jnp.array([q0])
-        eta0 = jnp.array([eta00])
-        xy = jnp.array([0.3, -0.4])
-
-        closed_form = lambda xy_: _u1_closed_form(p0, q0, eta00, xy_[0], xy_[1])
-        expected_third = jax.jacfwd(jax.hessian(closed_form))(xy)
-        got_third = third_derivative_u_n(p, q, eta0, xy[0], xy[1])
-
-        assert jnp.allclose(got_third, expected_third, atol=1e-6)
-
     def test_derived_quantities_match_tensor_contractions(self):
         s = 1.0 / jnp.sqrt(2.0)
         p = jnp.array([s, s])
@@ -337,7 +302,6 @@ class TestDifferentialHelpers:
         grad = grad_u_n(p, q, eta0, X, Y)
         hessian = hessian_u_n(p, q, eta0, X, Y)
         hessian_grad = hessian_u_n_grad(p, q, eta0, X, Y)
-        third = third_derivative_u_n(p, q, eta0, X, Y)
 
         assert jnp.allclose(grad_u_n_norm(p, q, eta0, X, Y), jnp.linalg.norm(grad, axis=-1), atol=1e-6)
         assert jnp.allclose(
@@ -360,15 +324,14 @@ class TestDifferentialHelpers:
             jnp.einsum("...i,...ij,...j->...", grad, hessian, grad),
             atol=1e-6,
         )
-        assert jnp.allclose(hessian_u_n_det(p, q, eta0, X, Y), jnp.linalg.det(hessian), atol=1e-6)
         assert jnp.allclose(
-            third_derivative_u_n_norm(p, q, eta0, X, Y),
-            jnp.sqrt(jnp.sum(third ** 2, axis=(-3, -2, -1))),
+            modica_quantity_u_n(p, q, eta0, X, Y),
+            jnp.einsum("...i,...i->...", grad, grad) - 2.0 * (1.0 - jnp.cos(u)),
             atol=1e-6,
         )
         assert jnp.allclose(hessian[..., 0, 0] + hessian[..., 1, 1], jnp.sin(u), atol=1e-5)
 
-    def test_heteroclinic_quantities_vanish(self):
+    def test_modica_quantity_vanishes_on_heteroclinic(self):
         p = jnp.array([0.0])
         q = jnp.array([1.0])
         eta0 = jnp.array([0.0])
@@ -377,20 +340,8 @@ class TestDifferentialHelpers:
         X, Y = jnp.meshgrid(xs, ys)
 
         assert jnp.allclose(modica_quantity_u_n(p, q, eta0, X, Y), 0.0, atol=1e-6)
-        assert jnp.allclose(modica_gradient_u_n(p, q, eta0, X, Y), 0.0, atol=1e-6)
-        assert jnp.allclose(hessian_u_n_det(p, q, eta0, X, Y), 0.0, atol=1e-6)
-        assert jnp.allclose(
-            one_dimensional_hessian_residual_u_n(p, q, eta0, X, Y),
-            0.0,
-            atol=1e-6,
-        )
-        assert jnp.allclose(
-            one_dimensional_third_derivative_residual_u_n(p, q, eta0, X, Y),
-            0.0,
-            atol=1e-6,
-        )
 
-    def test_saddle_quantities_are_nontrivial(self):
+    def test_modica_quantity_is_nontrivial_on_saddle(self):
         s = 1.0 / jnp.sqrt(2.0)
         p = jnp.array([s, s])
         q = jnp.array([s, -s])
@@ -399,13 +350,6 @@ class TestDifferentialHelpers:
         X, Y = jnp.meshgrid(xs, xs)
 
         assert jnp.max(jnp.abs(modica_quantity_u_n(p, q, eta0, X, Y))) > 1e-2
-        assert jnp.max(modica_gradient_u_n_norm(p, q, eta0, X, Y)) > 1e-2
-        assert jnp.max(jnp.abs(hessian_u_n_det(p, q, eta0, X, Y))) > 1e-2
-        assert jnp.max(one_dimensional_hessian_residual_u_n_norm(p, q, eta0, X, Y)) > 1e-2
-        assert (
-            jnp.max(one_dimensional_third_derivative_residual_u_n_norm(p, q, eta0, X, Y))
-            > 1e-2
-        )
 
     def test_angle_wrappers_match_canonical_helpers(self):
         theta = jnp.array([jnp.pi / 4.0, -jnp.pi / 4.0])
@@ -441,44 +385,8 @@ class TestDifferentialHelpers:
             hessian_u_n_grad_grad(p, q, eta0, x0, y0),
         )
         assert jnp.allclose(
-            hessian_u_n_det_from_angles(theta, eta0, x0, y0),
-            hessian_u_n_det(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            third_derivative_u_n_from_angles(theta, eta0, x0, y0),
-            third_derivative_u_n(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            third_derivative_u_n_norm_from_angles(theta, eta0, x0, y0),
-            third_derivative_u_n_norm(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
             modica_quantity_u_n_from_angles(theta, eta0, x0, y0),
             modica_quantity_u_n(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            modica_gradient_u_n_from_angles(theta, eta0, x0, y0),
-            modica_gradient_u_n(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            modica_gradient_u_n_norm_from_angles(theta, eta0, x0, y0),
-            modica_gradient_u_n_norm(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            one_dimensional_hessian_residual_u_n_from_angles(theta, eta0, x0, y0),
-            one_dimensional_hessian_residual_u_n(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            one_dimensional_hessian_residual_u_n_norm_from_angles(theta, eta0, x0, y0),
-            one_dimensional_hessian_residual_u_n_norm(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            one_dimensional_third_derivative_residual_u_n_from_angles(theta, eta0, x0, y0),
-            one_dimensional_third_derivative_residual_u_n(p, q, eta0, x0, y0),
-        )
-        assert jnp.allclose(
-            one_dimensional_third_derivative_residual_u_n_norm_from_angles(theta, eta0, x0, y0),
-            one_dimensional_third_derivative_residual_u_n_norm(p, q, eta0, x0, y0),
         )
 
 
